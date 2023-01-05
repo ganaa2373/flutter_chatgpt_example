@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:http/http.dart' as http;
-import 'package:learning/constant.dart';
 import 'model.dart';
 
 void main() {
@@ -31,30 +31,35 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-Future<String> generateResponse(String prompt) async {
-  final apiKey = apiSecretKey;
-
-  var url = Uri.https("api.openai.com", "/v1/completions");
+Future<String> generateResponse(String text, int type) async {
+String apiKey = "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";
+String endPoint = type == 0 ? "/v1/completions" : "/v1/images/generations";
+  var url = Uri.https("api.openai.com",  endPoint);
   final response = await http.post(
     url,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $apiKey'
     },
-    body: jsonEncode({
+   
+    body: type == 0 ? jsonEncode({
       "model": "text-davinci-003",
-      "prompt": prompt,
+      "prompt": text,
       'temperature': 0,
       'max_tokens': 2000,
       'top_p': 1,
       'frequency_penalty': 0.0,
       'presence_penalty': 0.0,
+    }) : jsonEncode({
+      "prompt": text,
+       'n':1,
+       'size': "1024x1024"
     }),
   );
 
   // Do something with the response
   Map<String, dynamic> newresponse = jsonDecode(response.body);
-  return newresponse['choices'][0]['text'];
+  return type == 0 ? newresponse['choices'][0]['text'] : newresponse['data'][0]['url'];
 }
 
 class _ChatPageState extends State<ChatPage> {
@@ -77,7 +82,7 @@ class _ChatPageState extends State<ChatPage> {
         title: const Padding(
           padding: EdgeInsets.all(8.0),
           child: Text(
-            "OpenAI's ChatGPT Flutter Example \n@ngjunya",
+            "Chat test",
             maxLines: 2,
             textAlign: TextAlign.center,
           ),
@@ -141,13 +146,14 @@ class _ChatPageState extends State<ChatPage> {
             _textController.clear();
             Future.delayed(const Duration(milliseconds: 50))
                 .then((_) => _scrollDown());
-            generateResponse(input).then((value) {
+            generateResponse(input, input.contains('cat') ? 1 : 0).then((value) {
               setState(() {
                 isLoading = false;
                 _messages.add(
                   ChatMessage(
-                    text: value,
+                    text: input.contains('cat') ? "" : value,
                     chatMessageType: ChatMessageType.bot,
+                    url: input.contains('cat') ? value : ""
                   ),
                 );
               });
@@ -189,6 +195,7 @@ class _ChatPageState extends State<ChatPage> {
         return ChatMessageWidget(
           text: message.text,
           chatMessageType: message.chatMessageType,
+          url: message.url,
         );
       },
     );
@@ -205,10 +212,11 @@ class _ChatPageState extends State<ChatPage> {
 
 class ChatMessageWidget extends StatelessWidget {
   const ChatMessageWidget(
-      {super.key, required this.text, required this.chatMessageType});
+      {super.key, required this.text, required this.chatMessageType, this.url });
 
   final String text;
   final ChatMessageType chatMessageType;
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
@@ -218,27 +226,13 @@ class ChatMessageWidget extends StatelessWidget {
       color: chatMessageType == ChatMessageType.bot
           ? botBackgroundColor
           : backgroundColor,
-      child: Row(
+      child: url == "" ? Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          chatMessageType == ChatMessageType.bot
-              ? Container(
-                  margin: const EdgeInsets.only(right: 16.0),
-                  child: CircleAvatar(
-                    backgroundColor: const Color.fromRGBO(16, 163, 127, 1),
-                    child: Image.asset(
-                      'assets/bot.png',
-                      color: Colors.white,
-                      scale: 1.5,
-                    ),
-                  ),
-                )
-              : Container(
+              Container(
                   margin: const EdgeInsets.only(right: 16.0),
                   child: const CircleAvatar(
-                    child: Icon(
-                      Icons.person,
-                    ),
+                    child: Icon(Icons.person),
                   ),
                 ),
           Expanded(
@@ -262,7 +256,8 @@ class ChatMessageWidget extends StatelessWidget {
             ),
           ),
         ],
-      ),
+      ) : 
+      Image.network(url.toString())
     );
   }
 }
